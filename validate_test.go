@@ -161,6 +161,154 @@ func TestValidateRejects(t *testing.T) {
 			},
 			wantProp: "entries[1].@type",
 		},
+		{
+			name: "recurrenceOverrides key is not a LocalDateTime",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					RecurrenceOverrides: map[string]PatchObject{
+						"not-a-datetime": {"title": json.RawMessage(`"moved"`)},
+					},
+				}).Validate()
+			},
+			wantProp: "recurrenceOverrides/not-a-datetime",
+		},
+		{
+			name: "recurrenceOverrides patch pointer targets root @type",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					RecurrenceOverrides: map[string]PatchObject{
+						"2020-01-08T14:00:00": {"@type": json.RawMessage(`"Task"`)},
+					},
+				}).Validate()
+			},
+			wantProp: "recurrenceOverrides/2020-01-08T14:00:00/@type",
+		},
+		{
+			name: "recurrenceOverrides patch pointer targets root uid",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					RecurrenceOverrides: map[string]PatchObject{
+						"2020-01-08T14:00:00": {"uid": json.RawMessage(`"y"`)},
+					},
+				}).Validate()
+			},
+			wantProp: "recurrenceOverrides/2020-01-08T14:00:00/uid",
+		},
+		{
+			name: "localizations patch pointer is malformed (bad escape)",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					Localizations: map[string]PatchObject{
+						"fr": {"title~2": json.RawMessage(`"bonjour"`)},
+					},
+				}).Validate()
+			},
+			wantProp: "localizations/fr/title~2",
+		},
+		{
+			name: "localizations patch pointer targets root @type",
+			validate: func() error {
+				return (&Task{
+					Type: typeTask, UID: "x",
+					Localizations: map[string]PatchObject{
+						"de": {"@type": json.RawMessage(`"Event"`)},
+					},
+				}).Validate()
+			},
+			wantProp: "localizations/de/@type",
+		},
+		{
+			name: "custom timeZone not present in timeZones",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					TimeZone: TimeZoneId("/custom"),
+				}).Validate()
+			},
+			wantProp: "timeZone",
+		},
+		{
+			name: "location custom timeZone not present in timeZones",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					Locations: map[Id]Location{
+						"loc1": {TimeZone: TimeZoneId("/elsewhere")},
+					},
+				}).Validate()
+			},
+			wantProp: "locations/loc1/timeZone",
+		},
+		{
+			name: "recurrence rule missing frequency",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					RecurrenceRules: []RecurrenceRule{{}},
+				}).Validate()
+			},
+			wantProp: "recurrenceRules[0].frequency",
+		},
+		{
+			name: "recurrence rule with unknown frequency",
+			validate: func() error {
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					RecurrenceRules: []RecurrenceRule{{Frequency: "fortnightly"}},
+				}).Validate()
+			},
+			wantProp: "recurrenceRules[0].frequency",
+		},
+		{
+			name: "recurrence rule with both count and until",
+			validate: func() error {
+				count := uint(5)
+				until := LocalDateTime{Year: 2020, Month: 12, Day: 31}
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					RecurrenceRules: []RecurrenceRule{{
+						Frequency: FrequencyDaily,
+						Count:     &count,
+						Until:     &until,
+					}},
+				}).Validate()
+			},
+			wantProp: "recurrenceRules[0]",
+		},
+		{
+			name: "excluded recurrence rule missing frequency",
+			validate: func() error {
+				return (&Task{
+					Type: typeTask, UID: "x",
+					ExcludedRecurrenceRules: []RecurrenceRule{{}},
+				}).Validate()
+			},
+			wantProp: "excludedRecurrenceRules[0].frequency",
+		},
+		{
+			name: "embedded timeZone transition rule with both count and until",
+			validate: func() error {
+				count := uint(2)
+				until := LocalDateTime{Year: 2020, Month: 12, Day: 31}
+				return (&Event{
+					Type: typeEvent, UID: "x",
+					TimeZones: map[TimeZoneId]TimeZone{
+						"/custom": {Standard: []TimeZoneRule{{
+							RecurrenceRules: []RecurrenceRule{{
+								Frequency: FrequencyYearly,
+								Count:     &count,
+								Until:     &until,
+							}},
+						}}},
+					},
+				}).Validate()
+			},
+			wantProp: "timeZones//custom/standard[0].recurrenceRules[0]",
+		},
 	}
 
 	for _, tt := range tests {
@@ -289,6 +437,134 @@ func TestValidateJoinsMultiple(t *testing.T) {
 	var verr *ValidationError
 	if !errors.As(err, &verr) {
 		t.Error("errors.As against the joined error did not bind a *ValidationError")
+	}
+}
+
+// TestValidateRecurrenceTimeZoneValid asserts the new phase-two checks accept
+// conformant objects: a resolved custom time zone, an IANA time zone (never
+// closure-checked), a well-formed override key with a nested patch pointer, and
+// a rule bounded by exactly one of count/until. None of these is a violation, so
+// adding the checks must not regress valid input.
+func TestValidateRecurrenceTimeZoneValid(t *testing.T) {
+	t.Parallel()
+
+	count := uint(3)
+	until := LocalDateTime{Year: 2020, Month: 12, Day: 31}
+
+	cases := []struct {
+		name  string
+		event *Event
+	}{
+		{
+			name: "custom timeZone resolved in timeZones",
+			event: &Event{
+				Type: typeEvent, UID: "x",
+				TimeZone:  TimeZoneId("/custom"),
+				TimeZones: map[TimeZoneId]TimeZone{"/custom": {TzID: "Etc/Custom"}},
+			},
+		},
+		{
+			name: "IANA timeZone needs no embedded definition",
+			event: &Event{
+				Type: typeEvent, UID: "x",
+				TimeZone: TimeZoneId("America/New_York"),
+			},
+		},
+		{
+			name: "override key valid with nested pointer",
+			event: &Event{
+				Type: typeEvent, UID: "x",
+				RecurrenceOverrides: map[string]PatchObject{
+					"2020-01-08T14:00:00": {
+						"title":                json.RawMessage(`"moved"`),
+						"locations/1/name":     json.RawMessage(`"Room B"`),
+						"participants/2/@type": json.RawMessage(`"Participant"`),
+					},
+				},
+			},
+		},
+		{
+			name: "rule bounded by count only",
+			event: &Event{
+				Type: typeEvent, UID: "x",
+				RecurrenceRules: []RecurrenceRule{{Frequency: FrequencyWeekly, Count: &count}},
+			},
+		},
+		{
+			name: "rule bounded by until only",
+			event: &Event{
+				Type: typeEvent, UID: "x",
+				RecurrenceRules: []RecurrenceRule{{Frequency: FrequencyWeekly, Until: &until}},
+			},
+		},
+		{
+			name: "localization removal pointer is valid",
+			event: &Event{
+				Type: typeEvent, UID: "x",
+				Localizations: map[string]PatchObject{
+					"fr": {"description": json.RawMessage(`null`)},
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if err := tc.event.Validate(); err != nil {
+				t.Errorf("Validate() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+// TestValidateRecurrenceReportsAllViolations asserts the recurrence/time-zone
+// checks join into the multi-violation contract: an Event that violates several
+// of the new rules at once returns each as a *ValidationError, so a caller that
+// iterates the joined error sees every problem rather than just the first.
+func TestValidateRecurrenceReportsAllViolations(t *testing.T) {
+	t.Parallel()
+
+	count := uint(1)
+	until := LocalDateTime{Year: 2021, Month: 1, Day: 1}
+	err := (&Event{
+		Type: typeEvent, UID: "x",
+		TimeZone: TimeZoneId("/missing"),
+		RecurrenceRules: []RecurrenceRule{{
+			Frequency: FrequencyDaily, Count: &count, Until: &until,
+		}},
+		RecurrenceOverrides: map[string]PatchObject{
+			"bad-key": {"@type": json.RawMessage(`"Task"`)},
+		},
+	}).Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want several violations")
+	}
+
+	want := map[string]bool{
+		"timeZone":                          false,
+		"recurrenceRules[0]":                false,
+		"recurrenceOverrides/bad-key":       false,
+		"recurrenceOverrides/bad-key/@type": false,
+	}
+	joined, ok := err.(interface{ Unwrap() []error })
+	if !ok {
+		t.Fatalf("multi-violation error %T does not Unwrap() []error", err)
+	}
+	for _, part := range joined.Unwrap() {
+		var verr *ValidationError
+		if !errors.As(part, &verr) {
+			t.Fatalf("joined part %v is not a *ValidationError", part)
+		}
+		if _, expected := want[verr.Property]; !expected {
+			t.Errorf("unexpected violation property %q", verr.Property)
+			continue
+		}
+		want[verr.Property] = true
+	}
+	for prop, seen := range want {
+		if !seen {
+			t.Errorf("missing expected violation for %q", prop)
+		}
 	}
 }
 
