@@ -30,15 +30,25 @@ import (
 //   - Group entries route to [Event]/[Task]; an entry that is neither (an
 //     absent/unknown "@type", including a nested "Group") is invalid (Section
 //     5.3.1).
+//   - recurrenceOverrides keys are valid [LocalDateTime] occurrence starts, and
+//     the PatchObject values of recurrenceOverrides and localizations carry only
+//     well-formed RFC 6901 pointers that do not target the root "@type"/"uid"
+//     (Sections 4.3.5, 4.6.1).
+//   - the custom-time-zone closure holds: every "/"-prefixed [TimeZoneId] the
+//     object references resolves in its timeZones map (Section 4.7.1).
+//   - each [RecurrenceRule] has a required, valid "frequency" and does not set
+//     both "count" and "until" (Section 4.3.1).
 //
-// Deliberately left to a later validation phase (and structured so it slots in
-// without reshaping this file — see validateEvent / validateTask, whose step
-// lists are the seam): RFC 6901 pointer well-formedness on recurrenceOverrides
-// and localizations keys; the recurrenceId/recurrenceIdTimeZone coupling; the
-// custom-time-zone closure (every "/"-prefixed [TimeZoneId] resolving in the
-// timeZones map, via [TimeZoneId.ResolvesIn]); and the RecurrenceRule
-// "count" XOR "until" exclusivity. Each is an independent check appendable to
-// the relevant step list; none changes the [ValidationError] contract below.
+// The recurrence and time-zone checks in the last three bullets live in
+// validate_recurrence.go and are appended to the Event and Task step lists via
+// validateRecurrenceAndTimeZones, which the seam in [Event.Validate] and
+// [Task.Validate] calls. They follow the same [ValidationError] contract as the
+// checks above.
+//
+// Deliberately still left to a later validation phase: the
+// recurrenceId/recurrenceIdTimeZone coupling, which needs the master/override
+// relationship the current pass does not model. It is an independent check
+// appendable to the relevant step list and changes none of the contract below.
 
 // ValidationError reports one violation of an RFC 8984 MUST found by a
 // [Event.Validate], [Task.Validate], or [Group.Validate] pass. It names the
@@ -106,6 +116,16 @@ func joinValidation(errs []*ValidationError) error {
 //   - No "due" member is present. "due" is a Task property (Section 5.2.1) and
 //     the Event type has no Due field; a "due" carried in [Event.Extra] — for
 //     example a Task property mistakenly merged onto an Event — is rejected.
+//   - Each "recurrenceOverrides" key is a valid [LocalDateTime] occurrence
+//     start, and every PatchObject pointer in "recurrenceOverrides" and
+//     "localizations" is a well-formed RFC 6901 pointer not targeting the root
+//     "@type"/"uid" (Sections 4.3.5, 4.6.1).
+//   - Every custom ("/"-prefixed) [TimeZoneId] the Event references — its
+//     "timeZone" and each location's "timeZone" — resolves in "timeZones"
+//     (Section 4.7.1).
+//   - Each rule in "recurrenceRules" and "excludedRecurrenceRules" (and in the
+//     embedded "timeZones" definitions) has a required, valid "frequency" and
+//     does not set both "count" and "until" (Section 4.3.1).
 //
 // A floating "start" (a [LocalDateTime] with no [Event.TimeZone]) is valid and
 // is not flagged: floating time is the spec's intended semantic, not an error
@@ -122,10 +142,19 @@ func (e *Event) Validate() error {
 	// reaches an Event is through the open-extension Extra map.
 	errs = appendIf(errs, validateNoExtraMember(e.Extra, "due",
 		"\"due\" is a Task property and is not permitted on an Event (Section 5.2.1)"))
-	// Seam for the later validation phase: recurrence-override pointer
-	// well-formedness, recurrenceId/recurrenceIdTimeZone coupling, custom
-	// time-zone closure, and RecurrenceRule count/until exclusivity each
-	// append their own *ValidationError here without changing the contract.
+	// Recurrence-override key and pointer well-formedness, localization pointer
+	// well-formedness, the custom-time-zone closure, and the RecurrenceRule
+	// constraints, over the Event's recurrence/time-zone fields (Sections 4.3,
+	// 4.6, 4.7). validateRecurrenceAndTimeZones reports them in a stable order.
+	errs = append(errs, validateRecurrenceAndTimeZones(recurrenceScope{
+		timeZone:                e.TimeZone,
+		locations:               e.Locations,
+		timeZones:               e.TimeZones,
+		recurrenceRules:         e.RecurrenceRules,
+		excludedRecurrenceRules: e.ExcludedRecurrenceRules,
+		recurrenceOverrides:     e.RecurrenceOverrides,
+		localizations:           e.Localizations,
+	})...)
 	return joinValidation(errs)
 }
 
@@ -151,13 +180,26 @@ func (e *Event) Validate() error {
 // the interplay is left lenient. A floating "start" (no [Task.TimeZone]) is
 // valid, as for an Event.
 //
+// The recurrence-override key/pointer, localization-pointer, custom-time-zone
+// closure, and RecurrenceRule checks listed on [Event.Validate] apply equally
+// to a Task, over its identically-shaped recurrence/time-zone fields.
+//
 // Violations are returned joined per the [ValidationError] contract.
 func (t *Task) Validate() error {
 	var errs []*ValidationError
 	errs = appendIf(errs, validateType(t.Type, typeTask))
 	errs = appendIf(errs, validateUID(t.UID))
-	// Seam for the later validation phase: the same recurrence/time-zone
-	// checks listed in Event.Validate append here for a Task.
+	// The same recurrence/time-zone checks Event.Validate runs, over the Task's
+	// identically-shaped recurrence/time-zone fields (Sections 4.3, 4.6, 4.7).
+	errs = append(errs, validateRecurrenceAndTimeZones(recurrenceScope{
+		timeZone:                t.TimeZone,
+		locations:               t.Locations,
+		timeZones:               t.TimeZones,
+		recurrenceRules:         t.RecurrenceRules,
+		excludedRecurrenceRules: t.ExcludedRecurrenceRules,
+		recurrenceOverrides:     t.RecurrenceOverrides,
+		localizations:           t.Localizations,
+	})...)
 	return joinValidation(errs)
 }
 
