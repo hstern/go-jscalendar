@@ -169,7 +169,8 @@ func TestTimeZoneDecodeTolerant(t *testing.T) {
 	})
 }
 
-// TestEventCustomTimeZoneRoundTrip is the JSCAL-20 acceptance assertion: an
+// TestEventCustomTimeZoneRoundTrip is the embedded-timeZones acceptance
+// assertion (RFC 8984, Sections 4.6.1 and 4.7.1): an
 // Event that carries a custom, "/"-prefixed timeZone defined in its embedded
 // timeZones map (with both a standard and a daylight rule) and a localizations
 // entry round-trips byte-stably through the codec, with both the timeZones and
