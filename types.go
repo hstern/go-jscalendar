@@ -116,9 +116,26 @@ type Event struct {
 	ExcludedRecurrenceRules []RecurrenceRule `json:"excludedRecurrenceRules,omitempty"`
 	// RecurrenceOverrides maps an occurrence's [LocalDateTime] start (as a
 	// string key) to a [PatchObject] that adjusts that one occurrence
-	// (Section 4.3.5). The key is a string rather than a typed
-	// LocalDateTime because encoding/json map keys must be strings; the
-	// key's grammar is validated at the validation boundary.
+	// (Section 4.3.5). Each key is a LocalDateTime equal to the overridden
+	// occurrence's start as the recurrence set produces it, expressed in the
+	// master object's TimeZone — not UTC and not an arbitrary identifier. The
+	// key is a string rather than a typed LocalDateTime because encoding/json
+	// map keys must be strings; the key's grammar is validated at the
+	// validation boundary.
+	//
+	// The patch values reuse the [PatchObject] codec: each adjusts the master
+	// for that one occurrence. A patch whose "excluded" pointer is set to true
+	// (the JSON `{"excluded":true}`) deletes that occurrence from the
+	// recurrence set rather than adding a patched instance — the spec's way of
+	// removing a single produced occurrence. A patch value of JSON null at a
+	// pointer removes the property it addresses (the §3.3 removal sentinel),
+	// which is distinct from the whole-occurrence "excluded" deletion. As with
+	// the recurrence rules, the library round-trips the overrides verbatim and
+	// leaves applying them — and the exclusion — to the consumer's expansion.
+	//
+	// A standalone, fully expanded override object (one that lives outside this
+	// map, e.g. fetched on its own) instead carries [Event.RecurrenceID] and
+	// [Event.RecurrenceIDTimeZone] to point back at the occurrence it replaces.
 	RecurrenceOverrides map[string]PatchObject `json:"recurrenceOverrides,omitempty"`
 
 	// --- Scheduling properties (Section 4.4) ---
@@ -249,8 +266,13 @@ type Task struct {
 	// expansion; the library only round-trips the rules.
 	ExcludedRecurrenceRules []RecurrenceRule `json:"excludedRecurrenceRules,omitempty"`
 	// RecurrenceOverrides maps an occurrence's [LocalDateTime] start (as a
-	// string key) to a [PatchObject] (Section 4.3.5). See the note on the
-	// Event field of the same name for why the key is a string.
+	// string key) to a [PatchObject] (Section 4.3.5). See the
+	// [Event.RecurrenceOverrides] documentation for the full semantics: the
+	// key is a LocalDateTime equal to the overridden occurrence's start in the
+	// master's TimeZone (a string because encoding/json map keys must be
+	// strings), an override that sets "excluded" to true deletes that
+	// occurrence, and a standalone override object carries
+	// [Task.RecurrenceID] / [Task.RecurrenceIDTimeZone] instead.
 	RecurrenceOverrides map[string]PatchObject `json:"recurrenceOverrides,omitempty"`
 
 	// --- Scheduling properties (Section 4.4) ---
