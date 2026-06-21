@@ -262,6 +262,11 @@ func FuzzEventCodec(f *testing.F) {
 	f.Add(`not json`)
 	f.Add(`[1,2,3]`)
 	f.Add(`{"start":"2020-01-15T13:00:00","duration":"PT1H"}`)
+	// Seeds carrying unknown members exercise the open-extension path
+	// (capture into Extra, splice back on marshal); the idempotence
+	// property below must hold for them too.
+	f.Add(`{"@type":"Event","uid":"e1","x-vendor":{"k":[1,2]}}`)
+	f.Add(`{"uid":"e1","futureProp":42,"@type":"Event","x-null":null}`)
 
 	f.Fuzz(func(t *testing.T, input string) {
 		var ev Event

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 )
 
 // The "@type" discriminator values for the three top-level object types
@@ -48,17 +49,18 @@ const (
 // codec rather than recursing into MarshalJSON. UnmarshalJSON decodes
 // through the same alias for an order-tolerant, lenient decode.
 //
-// Open-extension seam (next phase). Unknown members are currently dropped
-// on decode and never emitted. Lossless preservation of unknown members —
-// a vendor extension and a future-spec property look identical on the wire
-// — is added next via an Extra field of type map[string]json.RawMessage.
-// The seam is the marshalKnown / unmarshalKnown boundary below: marshalKnown
-// produces the bytes for the known fields with "@type" first, and the
-// open-extension phase will splice the Extra members into that byte stream
-// (between the known members and the closing brace) and, on decode, capture
-// any member unmarshalKnown did not consume. Keeping that splice in one
-// place is why the alias encode/decode is funneled through these two
-// helpers rather than inlined per type.
+// Open-extension seam. Unknown members are preserved losslessly — a vendor
+// extension and a future-spec property look identical on the wire, and both
+// must round-trip — via the Extra field (map[string]json.RawMessage) on each
+// top-level type. The seam is the marshalKnown / unmarshalKnown boundary
+// below: marshalKnown produces the bytes for the known fields with "@type"
+// first, then splices the Extra members into that byte stream (between the
+// known members and the closing brace, in sorted key order); unmarshalKnown
+// decodes the known fields and captures any member it did not consume into
+// Extra. Keeping that splice in one place is why the alias encode/decode is
+// funneled through these two helpers rather than inlined per type. The splice
+// and capture mechanics live in extra.go, alongside the DecodeJSON /
+// EncodeJSON accessors.
 
 // These aliases carry the field set and struct tags of their named types
 // but none of the methods, so encoding/json applies its default struct
@@ -80,16 +82,19 @@ type (
 // first declared field and now always non-empty despite the omitempty
 // tag).
 //
-// This is the open-extension seam: the next phase splices an object's
-// Extra members into the byte stream this function returns, just before
-// the closing brace, preserving "@type"-first order and the known-field
-// ordering.
-func marshalKnown(alias any, typeName string) ([]byte, error) {
-	out, err := json.Marshal(alias)
+// This is the open-extension seam: extra holds the object's unknown
+// members, which spliceExtra appends to the byte stream this function
+// returns, just before the closing brace and in sorted key order,
+// preserving "@type"-first order and the known-field ordering. A member in
+// extra whose name collides with a known property is dropped (the known
+// property is authoritative), so the output is always valid JSON regardless
+// of how a caller populated the Extra map.
+func marshalKnown(alias any, typeName string, extra map[string]json.RawMessage) ([]byte, error) {
+	known, err := json.Marshal(alias)
 	if err != nil {
 		return nil, fmt.Errorf("jscalendar: marshal %s: %w", typeName, err)
 	}
-	return out, nil
+	return spliceExtra(known, extra, reflect.TypeOf(alias), typeName)
 }
 
 // unmarshalKnown decodes data into the method-stripped alias pointed to by
@@ -104,83 +109,101 @@ func marshalKnown(alias any, typeName string) ([]byte, error) {
 //
 // setType assigns the discriminator on the decoded value; it is passed
 // separately because the alias is handled as an opaque any here. This is
-// the decode side of the open-extension seam: the next phase captures the
-// members this decoder does not consume into the object's Extra field.
-func unmarshalKnown(data []byte, aliasPtr any, typeName string, setType func()) error {
+// the decode side of the open-extension seam: captureExtra collects the
+// members this decoder does not map to a known field, which the caller
+// stores in the object's Extra field. The returned map is nil when the
+// input carried no unknown members.
+func unmarshalKnown(data []byte, aliasPtr any, typeName string, setType func()) (map[string]json.RawMessage, error) {
 	if !isJSONObject(data) {
-		return fmt.Errorf("jscalendar: decode %s: expected a JSON object", typeName)
+		return nil, fmt.Errorf("jscalendar: decode %s: expected a JSON object", typeName)
 	}
 	if err := json.Unmarshal(data, aliasPtr); err != nil {
-		return fmt.Errorf("jscalendar: decode %s: %w", typeName, err)
+		return nil, fmt.Errorf("jscalendar: decode %s: %w", typeName, err)
+	}
+	extra, err := captureExtra(data, reflect.TypeOf(aliasPtr).Elem())
+	if err != nil {
+		return nil, fmt.Errorf("jscalendar: decode %s: %w", typeName, err)
 	}
 	setType()
-	return nil
+	return extra, nil
 }
 
 // MarshalJSON encodes the Event with "@type":"Event" as the first member
-// and the remaining known properties in declaration order, yielding
-// byte-stable output. The discriminator is set automatically: a zero or
-// mismatched [Event.Type] is normalized to "Event".
+// and the remaining known properties in declaration order, followed by any
+// [Event.Extra] members in sorted key order, yielding byte-stable output.
+// The discriminator is set automatically: a zero or mismatched [Event.Type]
+// is normalized to "Event".
 func (e Event) MarshalJSON() ([]byte, error) {
 	a := eventAlias(e)
 	a.Type = typeEvent
-	return marshalKnown(a, typeEvent)
+	return marshalKnown(a, typeEvent, e.Extra)
 }
 
 // UnmarshalJSON decodes a JSON object into the Event. It is tolerant of
 // member order and of a missing "@type"; strict checks belong to the
 // validation phase. [Event.Type] is set to "Event" after a successful
-// decode regardless of the wire value.
+// decode regardless of the wire value. Members with no corresponding known
+// property are captured into [Event.Extra] for lossless round-tripping.
 func (e *Event) UnmarshalJSON(data []byte) error {
 	var a eventAlias
-	if err := unmarshalKnown(data, &a, typeEvent, func() { a.Type = typeEvent }); err != nil {
+	extra, err := unmarshalKnown(data, &a, typeEvent, func() { a.Type = typeEvent })
+	if err != nil {
 		return err
 	}
 	*e = Event(a)
+	e.Extra = extra
 	return nil
 }
 
 // MarshalJSON encodes the Task with "@type":"Task" as the first member,
-// byte-stable in declaration order. A zero or mismatched [Task.Type] is
-// normalized to "Task".
+// then the known properties in declaration order and any [Task.Extra]
+// members in sorted key order, byte-stable throughout. A zero or mismatched
+// [Task.Type] is normalized to "Task".
 func (t Task) MarshalJSON() ([]byte, error) {
 	a := taskAlias(t)
 	a.Type = typeTask
-	return marshalKnown(a, typeTask)
+	return marshalKnown(a, typeTask, t.Extra)
 }
 
 // UnmarshalJSON decodes a JSON object into the Task, tolerant of member
 // order and a missing "@type". [Task.Type] is set to "Task" after a
-// successful decode regardless of the wire value.
+// successful decode regardless of the wire value. Members with no
+// corresponding known property are captured into [Task.Extra].
 func (t *Task) UnmarshalJSON(data []byte) error {
 	var a taskAlias
-	if err := unmarshalKnown(data, &a, typeTask, func() { a.Type = typeTask }); err != nil {
+	extra, err := unmarshalKnown(data, &a, typeTask, func() { a.Type = typeTask })
+	if err != nil {
 		return err
 	}
 	*t = Task(a)
+	t.Extra = extra
 	return nil
 }
 
 // MarshalJSON encodes the Group with "@type":"Group" as the first member,
-// byte-stable in declaration order. A zero or mismatched [Group.Type] is
-// normalized to "Group". The Entries members are emitted verbatim as raw
-// JSON, preserving each member's exact bytes.
+// then the known properties in declaration order and any [Group.Extra]
+// members in sorted key order, byte-stable throughout. A zero or mismatched
+// [Group.Type] is normalized to "Group". The Entries members are emitted
+// verbatim as raw JSON, preserving each member's exact bytes.
 func (g Group) MarshalJSON() ([]byte, error) {
 	a := groupAlias(g)
 	a.Type = typeGroup
-	return marshalKnown(a, typeGroup)
+	return marshalKnown(a, typeGroup, g.Extra)
 }
 
 // UnmarshalJSON decodes a JSON object into the Group, tolerant of member
 // order and a missing "@type". [Group.Type] is set to "Group" after a
 // successful decode regardless of the wire value. Each Entries member is
-// retained as raw JSON.
+// retained as raw JSON; members with no corresponding known property are
+// captured into [Group.Extra].
 func (g *Group) UnmarshalJSON(data []byte) error {
 	var a groupAlias
-	if err := unmarshalKnown(data, &a, typeGroup, func() { a.Type = typeGroup }); err != nil {
+	extra, err := unmarshalKnown(data, &a, typeGroup, func() { a.Type = typeGroup })
+	if err != nil {
 		return err
 	}
 	*g = Group(a)
+	g.Extra = extra
 	return nil
 }
 

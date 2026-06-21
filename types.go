@@ -150,6 +150,22 @@ type Event struct {
 	// embedded timeZones map. Their value types (Participant, Location,
 	// VirtualLocation, Link, Relation, Alert, TimeZone) are added in
 	// phase 4; the fields land with them.
+
+	// Extra holds object members with no corresponding known property —
+	// vendor extensions and properties from future spec revisions, which
+	// are indistinguishable on the wire and must both survive a round
+	// trip (RFC 8984 treats unrecognized members as data to preserve, not
+	// discard). The codec captures any unknown member here on decode and
+	// re-emits it on encode, so unknown input round-trips losslessly. The
+	// json:"-" tag keeps the default struct codec away from the field;
+	// codec.go splices these members onto the wire after the known
+	// properties, in sorted key order, for byte-stable output. Values are
+	// kept as [json.RawMessage] for byte-stable, allocation-free
+	// preservation — no map[string]any reordering, no deserialize cost
+	// for members the consumer never reads. Use [DecodeJSON] and
+	// [EncodeJSON] for typed access. A member whose name matches a known
+	// property is decoded into that property and is never captured here.
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 // Task is a JSCalendar "Task" (RFC 8984, Section 2.2): a to-do that may
@@ -261,6 +277,14 @@ type Task struct {
 	// TODO(phase 4, JSCAL-18/19/20): participants, locations,
 	// virtualLocations, links, relatedTo, alerts, localizations, and the
 	// embedded timeZones map land with their value types in phase 4.
+
+	// Extra holds object members with no corresponding known property.
+	// See the [Event.Extra] documentation for the full semantics: unknown
+	// members are captured here on decode and re-emitted on encode so a
+	// vendor extension or future-spec property round-trips losslessly and
+	// byte-stably. The json:"-" tag reserves the field for the codec. Use
+	// [DecodeJSON] and [EncodeJSON] for typed access.
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 // Group is a JSCalendar "Group" (RFC 8984, Section 2.3): an ordered
@@ -324,4 +348,12 @@ type Group struct {
 
 	// TODO(phase 4, JSCAL-19/20): links, relatedTo, localizations, and the
 	// embedded timeZones map land with their value types in phase 4.
+
+	// Extra holds object members with no corresponding known property.
+	// See the [Event.Extra] documentation for the full semantics: unknown
+	// members are captured here on decode and re-emitted on encode so a
+	// vendor extension or future-spec property round-trips losslessly and
+	// byte-stably. The json:"-" tag reserves the field for the codec. Use
+	// [DecodeJSON] and [EncodeJSON] for typed access.
+	Extra map[string]json.RawMessage `json:"-"`
 }
