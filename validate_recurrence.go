@@ -47,7 +47,8 @@ func validateRecurrenceOverrides(overrides map[string]PatchObject) []*Validation
 			errs = append(errs, &ValidationError{
 				Property: prop,
 				Message: fmt.Sprintf(
-					"key must be a valid LocalDateTime occurrence start (Section 4.3.5): %v", err),
+					"key must be a valid LocalDateTime occurrence start (Section 4.3.5): %v", err,
+				),
 			})
 		}
 		errs = append(errs, validatePatchPointers(prop, overrides[key])...)
@@ -146,7 +147,8 @@ func checkTimeZoneRef(prop string, ref TimeZoneId, present func(TimeZoneId) bool
 	return &ValidationError{
 		Property: prop,
 		Message: fmt.Sprintf(
-			"custom time zone %q is not defined in timeZones (Section 4.7.1)", string(ref)),
+			"custom time zone %q is not defined in timeZones (Section 4.7.1)", string(ref),
+		),
 	}
 }
 
@@ -179,7 +181,8 @@ func validateRecurrenceRule(prop string, rule RecurrenceRule) []*ValidationError
 		errs = append(errs, &ValidationError{
 			Property: prop + ".frequency",
 			Message: fmt.Sprintf(
-				"%q is not a valid frequency (Section 4.3.1)", string(rule.Frequency)),
+				"%q is not a valid frequency (Section 4.3.1)", string(rule.Frequency),
+			),
 		})
 	}
 	if rule.HasCount() && rule.HasUntil() {

@@ -113,9 +113,8 @@ type Participant struct {
 	MemberOf map[Id]bool `json:"memberOf,omitempty"`
 	// Links is the set of [Id]s, keyed into the object's links property, of
 	// links relevant to this participant; every map value MUST be true
-	// (Section 4.4.6). The Link value type itself arrives with the links
-	// property in a later phase; the reference set is modeled here so a
-	// participant carrying linkIds round-trips.
+	// (Section 4.4.6). The values reference [Link] entries by their map [Id];
+	// the set itself carries no Link bodies, only the cross-references.
 	Links map[Id]bool `json:"linkIds,omitempty"`
 	// Language is the BCP 47 language tag for the participant's preferred
 	// language for communication (Section 4.4.6).

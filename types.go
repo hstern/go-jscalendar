@@ -27,9 +27,9 @@ import "encoding/json"
 // ignored, a missing "@type" is accepted — strict checks are the
 // validation phase's job). The codec relies on the field declaration order
 // below for byte-stable output, so reordering fields changes the wire
-// order; keep "@type" first. An open-extension Extra field for lossless
-// round-trip of unknown members lands in a later phase; codec.go documents
-// the seam where it slots in.
+// order; keep "@type" first. Each type carries an Extra field that captures
+// unknown members for a lossless round-trip; codec.go and extra.go document
+// the seam that splices them onto the wire.
 
 // Event is a JSCalendar "Event" (RFC 8984, Section 2.1): a scheduled item
 // occupying a region of time, anchored by a [Event.Start] and a
@@ -457,9 +457,10 @@ type Group struct {
 	// --- Group-specific properties (Section 5.3) ---
 
 	// Entries is the collection of group members (Section 5.3.1). Each
-	// entry is an [Event] or [Task]; it is retained as [json.RawMessage]
-	// for now so the exact member bytes round-trip. Typed dispatch on the
-	// member "@type" arrives with Parse in a later phase.
+	// entry is an [Event] or [Task], retained as [json.RawMessage] so the
+	// exact member bytes round-trip. Decode an entry to its concrete type on
+	// demand with [Group.Entry], which routes on the member's "@type";
+	// [Group.NumEntries] bounds the loop.
 	Entries []json.RawMessage `json:"entries,omitempty"`
 	// Source is the URI from which updated versions of the group may be
 	// retrieved (Section 5.3.2).

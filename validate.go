@@ -317,7 +317,8 @@ func validateGroupEntry(g *Group, i int) *ValidationError {
 		return &ValidationError{
 			Property: prop,
 			Message: fmt.Sprintf(
-				"entry @type %q must be \"Event\" or \"Task\" (Section 5.3.1)", typ),
+				"entry @type %q must be \"Event\" or \"Task\" (Section 5.3.1)", typ,
+			),
 		}
 	}
 }
