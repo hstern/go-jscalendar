@@ -99,10 +99,20 @@ type Event struct {
 	// NOT be set otherwise.
 	RecurrenceIDTimeZone TimeZoneId `json:"recurrenceIdTimeZone,omitempty"`
 	// RecurrenceRules generate the recurrence set from Start (Section
-	// 4.3.3).
+	// 4.3.3). Each rule is evaluated against the master object's Start, so
+	// the recurrence set is the union of the instances every rule produces.
+	// Expanding the rules into concrete occurrences is a consumer concern
+	// and out of scope for this library: the model carries the rules
+	// verbatim and leaves expansion to the caller.
 	RecurrenceRules []RecurrenceRule `json:"recurrenceRules,omitempty"`
 	// ExcludedRecurrenceRules subtract instances from the set produced by
-	// RecurrenceRules (Section 4.3.4).
+	// RecurrenceRules (Section 4.3.4). The excluded rules are evaluated
+	// against the same master Start as RecurrenceRules, and the instances
+	// they generate are removed from the recurrence set — an instance is
+	// part of the set only if some RecurrenceRules rule produces it and no
+	// ExcludedRecurrenceRules rule does. As with RecurrenceRules, this
+	// subtraction is a semantic the consumer performs during expansion; the
+	// library only round-trips the rules.
 	ExcludedRecurrenceRules []RecurrenceRule `json:"excludedRecurrenceRules,omitempty"`
 	// RecurrenceOverrides maps an occurrence's [LocalDateTime] start (as a
 	// string key) to a [PatchObject] that adjusts that one occurrence
@@ -225,10 +235,18 @@ type Task struct {
 	// RecurrenceIDTimeZone is the master instance's time zone (Section
 	// 4.3.2). Coupled to RecurrenceID per the spec.
 	RecurrenceIDTimeZone TimeZoneId `json:"recurrenceIdTimeZone,omitempty"`
-	// RecurrenceRules generate the recurrence set (Section 4.3.3).
+	// RecurrenceRules generate the recurrence set from Start (Section
+	// 4.3.3). See the [Event.RecurrenceRules] documentation for the full
+	// semantics: each rule is evaluated against the master object's Start,
+	// and expanding the rules into concrete occurrences is a consumer
+	// concern this library leaves to the caller.
 	RecurrenceRules []RecurrenceRule `json:"recurrenceRules,omitempty"`
 	// ExcludedRecurrenceRules subtract from the recurrence set (Section
-	// 4.3.4).
+	// 4.3.4). See the [Event.ExcludedRecurrenceRules] documentation: the
+	// excluded rules are evaluated against the same master Start, and the
+	// instances they generate are removed from the set RecurrenceRules
+	// produces. The subtraction is performed by the consumer during
+	// expansion; the library only round-trips the rules.
 	ExcludedRecurrenceRules []RecurrenceRule `json:"excludedRecurrenceRules,omitempty"`
 	// RecurrenceOverrides maps an occurrence's [LocalDateTime] start (as a
 	// string key) to a [PatchObject] (Section 4.3.5). See the note on the
