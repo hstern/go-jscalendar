@@ -19,14 +19,16 @@ import "encoding/json"
 // added alongside its value type so the struct never carries a field whose
 // type does not yet compile.
 //
-// Marshaling note: these structs currently rely on the standard library's
-// default struct-tag encoding. RFC 8984 (Section 1.4.1) requires the
-// "@type" member to be present and emitted first; that is satisfied here
-// only incidentally, because Type is the first declared field and
-// encoding/json emits struct fields in declaration order. A dedicated
-// "@type"-first codec with tolerant decoding and an open-extension Extra
-// field lands in a later phase and will replace the default marshal; until
-// then the default encoding round-trips these types with encoding/json.
+// Marshaling note: the JSON codec for these three types lives in codec.go.
+// It emits the "@type" member first and always present (RFC 8984, Section
+// 1.4.1), forcing the discriminator to the correct value even when the
+// Type field is left zero, and decodes tolerantly (member order is
+// ignored, a missing "@type" is accepted — strict checks are the
+// validation phase's job). The codec relies on the field declaration order
+// below for byte-stable output, so reordering fields changes the wire
+// order; keep "@type" first. An open-extension Extra field for lossless
+// round-trip of unknown members lands in a later phase; codec.go documents
+// the seam where it slots in.
 
 // Event is a JSCalendar "Event" (RFC 8984, Section 2.1): a scheduled item
 // occupying a region of time, anchored by a [Event.Start] and a
@@ -39,8 +41,9 @@ import "encoding/json"
 // such checks belong to a later opt-in validation pass.
 type Event struct {
 	// Type is the "@type" discriminator and MUST equal "Event" (Section
-	// 4.1.1). It is the first field so the default encoding emits it
-	// first, as the spec requires.
+	// 4.1.1). It is the first declared field so the codec emits it first;
+	// the codec also forces the value to "Event", so a zero Type still
+	// marshals correctly.
 	Type string `json:"@type,omitempty"`
 
 	// --- Metadata properties (Section 4.1) ---
@@ -157,7 +160,8 @@ type Event struct {
 // are optional and omitted when zero.
 type Task struct {
 	// Type is the "@type" discriminator and MUST equal "Task" (Section
-	// 4.1.1). First field so the default encoding emits it first.
+	// 4.1.1). First declared field so the codec emits it first; the codec
+	// forces the value to "Task", so a zero Type still marshals correctly.
 	Type string `json:"@type,omitempty"`
 
 	// --- Metadata properties (Section 4.1) ---
@@ -269,7 +273,8 @@ type Task struct {
 // have no meaning for a collection.
 type Group struct {
 	// Type is the "@type" discriminator and MUST equal "Group" (Section
-	// 4.1.1). First field so the default encoding emits it first.
+	// 4.1.1). First declared field so the codec emits it first; the codec
+	// forces the value to "Group", so a zero Type still marshals correctly.
 	Type string `json:"@type,omitempty"`
 
 	// --- Metadata properties (Section 4.1) ---
