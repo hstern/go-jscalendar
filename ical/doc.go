@@ -26,12 +26,13 @@
 // (whose package is also named ical), this package aliases the import as
 // goical.
 //
-// # Status
+// # Round trip
 //
-// The conversion functions are skeletons: [FromICal] and [ToICal] currently
-// return [ErrNotImplemented]. Their behavior is filled in by subsequent
-// phase-6 changes — FromICal (iCalendar to JSCalendar) and ToICal (JSCalendar
-// to iCalendar) land separately. The signatures are published now so the
-// package compiles, participates in CI, and pins the API the implementations
-// will satisfy.
+// [FromICal] (iCalendar to JSCalendar) and [ToICal] (JSCalendar to iCalendar)
+// are inverses over the property correspondence above. The round trip is
+// semantic, not byte-exact: iCalendar property ordering and line folding are
+// not significant, and a handful of JSCalendar constructs have no faithful
+// iCalendar form (documented as lossy edges on [ToICal]). The conformance
+// corpus run under the "interop" build tag asserts the round trip over the
+// lossless edges and pins the lossy ones.
 package ical

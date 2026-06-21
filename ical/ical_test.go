@@ -4,7 +4,6 @@
 package ical_test
 
 import (
-	"errors"
 	"testing"
 
 	goical "github.com/emersion/go-ical"
@@ -41,26 +40,35 @@ func TestFromICalNil(t *testing.T) {
 	}
 }
 
-// TestToICalNotImplemented pins the inverse skeleton contract.
-func TestToICalNotImplemented(t *testing.T) {
+// TestToICalUnsupportedType confirms a non-object argument is a conversion
+// error rather than a panic. The error is not exported as a typed sentinel; the
+// contract is only that ToICal fails on an unsupported dynamic type.
+func TestToICalUnsupportedType(t *testing.T) {
 	t.Parallel()
 
-	cal, err := ical.ToICal(&jscalendar.Event{})
-	if !errors.Is(err, ical.ErrNotImplemented) {
-		t.Fatalf("ToICal error = %v, want ErrNotImplemented", err)
+	cal, err := ical.ToICal("not an object")
+	if err == nil {
+		t.Fatal("ToICal on a string returned no error, want a conversion error")
 	}
 	if cal != nil {
-		t.Errorf("ToICal calendar = %v, want nil", cal)
+		t.Errorf("ToICal calendar = %v, want nil on error", cal)
 	}
 }
 
 // TestToICalNoArgs confirms the variadic entry point is callable with no
-// objects and still returns the skeleton sentinel rather than panicking.
+// objects, yielding an empty-but-valid calendar skeleton rather than panicking.
 func TestToICalNoArgs(t *testing.T) {
 	t.Parallel()
 
-	if _, err := ical.ToICal(); !errors.Is(err, ical.ErrNotImplemented) {
-		t.Fatalf("ToICal() error = %v, want ErrNotImplemented", err)
+	cal, err := ical.ToICal()
+	if err != nil {
+		t.Fatalf("ToICal() error = %v, want nil", err)
+	}
+	if cal == nil {
+		t.Fatal("ToICal() calendar = nil, want a VCALENDAR skeleton")
+	}
+	if got := cal.Props.Get(goical.PropVersion); got == nil || got.Value != "2.0" {
+		t.Errorf("VERSION = %v, want 2.0", got)
 	}
 }
 
