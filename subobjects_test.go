@@ -203,7 +203,8 @@ func TestSubObjectExtraTypedAccess(t *testing.T) {
 	}
 }
 
-// TestEventSubObjectMapsTyped is the JSCAL-18 acceptance assertion: the
+// TestEventSubObjectMapsTyped is the sub-object typed-maps acceptance
+// assertion: the
 // corpus figures that carry sub-objects populate the TYPED Event maps
 // (Participants, Locations, VirtualLocations) rather than dropping them into
 // the open-extension Extra map. It parses the figures via the package's
@@ -279,11 +280,24 @@ func TestEventSubObjectMapsTyped(t *testing.T) {
 		if vloc.URI != "https://stream.example.com/the_band_2020" {
 			t.Errorf("VirtualLocation URI = %q", vloc.URI)
 		}
-		// locale and localizations are not typed here; they stay in Extra.
-		for _, k := range []string{"locale", "localizations"} {
-			if _, found := ev.Extra[k]; !found {
-				t.Errorf("%q missing from Extra; phase-4 leftover should round-trip there", k)
-			}
+		// localizations is a typed field; it must populate Localizations, not
+		// leak into Extra.
+		if _, found := ev.Extra["localizations"]; found {
+			t.Error("\"localizations\" landed in Extra, want the typed field")
+		}
+		if len(ev.Localizations) != 1 {
+			t.Fatalf("Localizations = %d, want 1", len(ev.Localizations))
+		}
+		de, ok := ev.Localizations["de"]
+		if !ok {
+			t.Fatal("localization key \"de\" missing")
+		}
+		if _, ok := de["title"]; !ok {
+			t.Errorf("de localization missing \"title\" patch entry; got keys %v", patchKeys(de))
+		}
+		// locale is not typed in this phase; it must still round-trip via Extra.
+		if _, found := ev.Extra["locale"]; !found {
+			t.Error("\"locale\" missing from Extra; it should round-trip there")
 		}
 	})
 
@@ -331,6 +345,15 @@ func locationKeys(ev *Event) []Id {
 func participantKeys(ev *Event) []Id {
 	keys := make([]Id, 0, len(ev.Participants))
 	for k := range ev.Participants {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// patchKeys returns a PatchObject's JSON-Pointer keys for error messages.
+func patchKeys(p PatchObject) []string {
+	keys := make([]string, 0, len(p))
+	for k := range p {
 		keys = append(keys, k)
 	}
 	return keys
