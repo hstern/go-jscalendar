@@ -12,14 +12,14 @@ import "encoding/json"
 // 5).
 //
 // Scope note: only the properties whose value types already exist in the
-// package are modeled here. The participants, locations, and
-// virtualLocations sub-object maps are modeled (their value types live in
-// participant.go and location.go). The remaining sub-object properties
-// whose value types arrive in a later phase — links, relatedTo, alerts,
-// localizations, and the embedded timeZones map — are deliberately omitted
-// for now; see the TODO markers below. Each will be added alongside its
-// value type so the struct never carries a field whose type does not yet
-// compile.
+// package are modeled here. The participants, locations, virtualLocations,
+// alerts, links, and relatedTo sub-object maps are modeled (their value
+// types live in participant.go, location.go, alert.go, link.go, and
+// relation.go). The remaining sub-object properties whose value types arrive
+// in a later phase — localizations and the embedded timeZones map — are
+// deliberately omitted for now; see the TODO markers below. Each will be
+// added alongside its value type so the struct never carries a field whose
+// type does not yet compile.
 //
 // Marshaling note: the JSON codec for these three types lives in codec.go.
 // It emits the "@type" member first and always present (RFC 8984, Section
@@ -187,10 +187,20 @@ type Event struct {
 	// (Section 4.2.6). The key is preserved verbatim.
 	VirtualLocations map[Id]VirtualLocation `json:"virtualLocations,omitempty"`
 
-	// TODO(phase 4, JSCAL-19/20): links, relatedTo, alerts, localizations,
-	// and the embedded timeZones map. Their value types (Link, Relation,
-	// Alert, TimeZone) are added in the remaining phase-4 issues; the fields
-	// land with them.
+	// Alerts maps a stable [Id] to an [Alert] (a reminder) for the event
+	// (Section 4.5.2). The key is preserved verbatim.
+	Alerts map[Id]Alert `json:"alerts,omitempty"`
+	// Links maps a stable [Id] to a [Link] (an external resource) relevant
+	// to the event (Section 1.4.11). The key is preserved verbatim.
+	Links map[Id]Link `json:"links,omitempty"`
+	// RelatedTo maps the UID of a related object to the [Relation] describing
+	// how this event relates to it (Section 4.1.3). The map key is the
+	// related object's UID string, not an [Id].
+	RelatedTo map[string]Relation `json:"relatedTo,omitempty"`
+
+	// TODO(phase 4): localizations (Section 4.7.2) and the embedded timeZones
+	// map (Section 4.7.1). Their value types land with the remaining phase-4
+	// work.
 
 	// Extra holds object members with no corresponding known property —
 	// vendor extensions and properties from future spec revisions, which
@@ -341,9 +351,20 @@ type Task struct {
 	// (Section 4.2.6). The key is preserved verbatim.
 	VirtualLocations map[Id]VirtualLocation `json:"virtualLocations,omitempty"`
 
-	// TODO(phase 4, JSCAL-19/20): links, relatedTo, alerts, localizations,
-	// and the embedded timeZones map land with their value types in the
-	// remaining phase-4 issues.
+	// Alerts maps a stable [Id] to an [Alert] (a reminder) for the task
+	// (Section 4.5.2). The key is preserved verbatim.
+	Alerts map[Id]Alert `json:"alerts,omitempty"`
+	// Links maps a stable [Id] to a [Link] (an external resource) relevant
+	// to the task (Section 1.4.11). The key is preserved verbatim.
+	Links map[Id]Link `json:"links,omitempty"`
+	// RelatedTo maps the UID of a related object to the [Relation] describing
+	// how this task relates to it (Section 4.1.3). The map key is the related
+	// object's UID string, not an [Id].
+	RelatedTo map[string]Relation `json:"relatedTo,omitempty"`
+
+	// TODO(phase 4): localizations (Section 4.7.2) and the embedded timeZones
+	// map (Section 4.7.1) land with their value types in the remaining
+	// phase-4 work.
 
 	// Extra holds object members with no corresponding known property.
 	// See the [Event.Extra] documentation for the full semantics: unknown
