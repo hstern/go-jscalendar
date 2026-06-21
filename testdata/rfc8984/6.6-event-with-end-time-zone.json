@@ -1,0 +1,1 @@
+{"@type":"Event","uid":"ce4e6e85-9f7a-4c3d-8b6e-7a1f0d2b9c34","title":"Flight XY51 to Tokyo","start":"2020-04-01T09:00:00","duration":"PT10H30M","timeZone":"Europe/Berlin","locations":{"1":{"@type":"Location","rel":"start","name":"Frankfurt Airport (FRA)"},"2":{"@type":"Location","rel":"end","name":"Narita International Airport (NRT)","timeZone":"Asia/Tokyo"}}}
