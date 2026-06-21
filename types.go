@@ -13,13 +13,12 @@ import "encoding/json"
 //
 // Scope note: only the properties whose value types already exist in the
 // package are modeled here. The participants, locations, virtualLocations,
-// alerts, links, and relatedTo sub-object maps are modeled (their value
-// types live in participant.go, location.go, alert.go, link.go, and
-// relation.go). The remaining sub-object properties whose value types arrive
-// in a later phase — localizations and the embedded timeZones map — are
-// deliberately omitted for now; see the TODO markers below. Each will be
-// added alongside its value type so the struct never carries a field whose
-// type does not yet compile.
+// alerts, links, relatedTo, localizations, and embedded timeZones sub-object
+// maps are all modeled (their value types live in participant.go,
+// location.go, alert.go, link.go, relation.go, patch.go, and timezone.go).
+// localizations reuses the [PatchObject] codec keyed by a language tag; the
+// timeZones map carries [TimeZone] definitions keyed by a custom,
+// "/"-prefixed [TimeZoneId].
 //
 // Marshaling note: the JSON codec for these three types lives in codec.go.
 // It emits the "@type" member first and always present (RFC 8984, Section
@@ -198,9 +197,30 @@ type Event struct {
 	// related object's UID string, not an [Id].
 	RelatedTo map[string]Relation `json:"relatedTo,omitempty"`
 
-	// TODO(phase 4): localizations (Section 4.7.2) and the embedded timeZones
-	// map (Section 4.7.1). Their value types land with the remaining phase-4
-	// work.
+	// Localizations maps a language tag to a [PatchObject] that, when applied
+	// to this event, yields the event's representation in that locale (Section
+	// 4.6.1). The key is an [RFC 5646] language tag (e.g. "de", "fr-CA"); the
+	// value is a patch whose JSON-Pointer keys target the properties to
+	// translate, reusing the same PatchObject codec as recurrence overrides.
+	// The base event is expressed in the language named by its own "locale"
+	// property; a localization patch never alters that base, only the derived
+	// per-locale view.
+	//
+	// [RFC 5646]: https://www.rfc-editor.org/rfc/rfc5646.html
+	Localizations map[string]PatchObject `json:"localizations,omitempty"`
+	// TimeZones maps a custom, "/"-prefixed [TimeZoneId] to its [TimeZone]
+	// definition, embedding the per-object time zones this event references
+	// (Section 4.7.1) — the JSCalendar equivalent of inlining the VTIMEZONEs
+	// an iCalendar object would carry. The key is the custom identifier
+	// verbatim, leading "/" included.
+	//
+	// Closure: any custom ("/"-prefixed) TimeZoneId referenced anywhere in the
+	// event — its own "timeZone", a location's "timeZone", and so on — MUST
+	// resolve to an entry in this map (Section 4.7.1). That closure is not
+	// enforced on decode, in keeping with the lenient-unmarshal posture; it is
+	// checked by the validation phase via [TimeZoneId.ResolvesIn] over this
+	// map. An IANA zone name needs no entry here.
+	TimeZones map[TimeZoneId]TimeZone `json:"timeZones,omitempty"`
 
 	// Extra holds object members with no corresponding known property —
 	// vendor extensions and properties from future spec revisions, which
@@ -362,9 +382,20 @@ type Task struct {
 	// object's UID string, not an [Id].
 	RelatedTo map[string]Relation `json:"relatedTo,omitempty"`
 
-	// TODO(phase 4): localizations (Section 4.7.2) and the embedded timeZones
-	// map (Section 4.7.1) land with their value types in the remaining
-	// phase-4 work.
+	// Localizations maps an [RFC 5646] language tag to a [PatchObject] that
+	// renders this task in that locale (Section 4.6.1). See
+	// [Event.Localizations] for the full semantics: the base task is in its
+	// own "locale", and each patch derives a per-locale view via JSON-Pointer
+	// keys, reusing the PatchObject codec.
+	//
+	// [RFC 5646]: https://www.rfc-editor.org/rfc/rfc5646.html
+	Localizations map[string]PatchObject `json:"localizations,omitempty"`
+	// TimeZones maps a custom, "/"-prefixed [TimeZoneId] to its [TimeZone]
+	// definition (Section 4.7.1). See [Event.TimeZones] for the full
+	// semantics, including the closure requirement that every custom
+	// TimeZoneId referenced by the task resolve to an entry here — a check the
+	// validation phase performs via [TimeZoneId.ResolvesIn], not the decoder.
+	TimeZones map[TimeZoneId]TimeZone `json:"timeZones,omitempty"`
 
 	// Extra holds object members with no corresponding known property.
 	// See the [Event.Extra] documentation for the full semantics: unknown
@@ -433,9 +464,6 @@ type Group struct {
 	// Source is the URI from which updated versions of the group may be
 	// retrieved (Section 5.3.2).
 	Source string `json:"source,omitempty"`
-
-	// TODO(phase 4, JSCAL-19/20): links, relatedTo, localizations, and the
-	// embedded timeZones map land with their value types in phase 4.
 
 	// Extra holds object members with no corresponding known property.
 	// See the [Event.Extra] documentation for the full semantics: unknown
