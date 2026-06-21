@@ -9,34 +9,12 @@ import (
 	goical "github.com/emersion/go-ical"
 )
 
-// ErrNotImplemented is returned by the conversion functions whose bodies have
-// not yet been written. It is a sentinel: callers may test for it with
-// [errors.Is] to distinguish "this conversion direction is not built yet" from
-// a genuine conversion failure once the implementations land.
+// ErrNotImplemented is returned by [ToICal], whose body has not yet been
+// written. It is a sentinel: callers may test for it with [errors.Is] to
+// distinguish "this conversion direction is not built yet" from a genuine
+// conversion failure once the implementation lands. [FromICal] is implemented
+// (see from_ical.go) and does not return it.
 var ErrNotImplemented = errors.New("jscalendar/ical: not implemented")
-
-// FromICal converts an iCalendar calendar into its JSCalendar objects.
-//
-// Each top-level component of cal (a VEVENT, VTODO, or the VCALENDAR taken as a
-// group) maps to one JSCalendar object, returned in document order. Every
-// element of the returned slice holds one of the concrete pointer types the
-// parent package's parse routing produces — a *jscalendar.Event,
-// *jscalendar.Task, or *jscalendar.Group — matching the contract of
-// jscalendar.Parse. Callers type-switch on each element to recover the concrete
-// type.
-//
-// The mapping follows the calext jscalendar-icalendar property correspondence:
-// for example DTSTART with a TZID parameter splits into the JSCalendar start
-// and timeZone properties, RRULE becomes a recurrence rule, VALARM becomes an
-// alert, and VTIMEZONE definitions populate the object's timeZones map.
-//
-// FromICal is a skeleton and currently returns [ErrNotImplemented]; the
-// conversion is implemented by a subsequent phase-6 change.
-//
-//nolint:revive // cal is named for the published godoc signature; the skeleton body ignores it until a subsequent phase-6 change.
-func FromICal(cal *goical.Calendar) ([]any, error) {
-	return nil, ErrNotImplemented
-}
 
 // ToICal converts one or more JSCalendar objects into a single iCalendar
 // calendar.

@@ -13,18 +13,31 @@ import (
 	"github.com/hstern/go-jscalendar/ical"
 )
 
-// TestFromICalNotImplemented pins the skeleton contract: until the conversion
-// lands in a subsequent phase-6 change, FromICal reports ErrNotImplemented and
-// yields no objects.
-func TestFromICalNotImplemented(t *testing.T) {
+// TestFromICalEmpty confirms FromICal on a calendar with no convertible
+// components yields no objects and no error, the base case of the conversion.
+func TestFromICalEmpty(t *testing.T) {
 	t.Parallel()
 
 	objs, err := ical.FromICal(goical.NewCalendar())
-	if !errors.Is(err, ical.ErrNotImplemented) {
-		t.Fatalf("FromICal error = %v, want ErrNotImplemented", err)
+	if err != nil {
+		t.Fatalf("FromICal error = %v, want nil", err)
 	}
 	if objs != nil {
 		t.Errorf("FromICal objects = %v, want nil", objs)
+	}
+}
+
+// TestFromICalNil confirms FromICal tolerates a nil calendar rather than
+// panicking, returning no objects.
+func TestFromICalNil(t *testing.T) {
+	t.Parallel()
+
+	objs, err := ical.FromICal(nil)
+	if err != nil {
+		t.Fatalf("FromICal(nil) error = %v, want nil", err)
+	}
+	if objs != nil {
+		t.Errorf("FromICal(nil) objects = %v, want nil", objs)
 	}
 }
 
