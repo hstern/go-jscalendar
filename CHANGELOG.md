@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   including a `PatchObject` application layer (`ApplyPatch`). The recurrence
   engine dependency is confined to this package and never enters the core
   package's import graph.
+- `jmap` sub-package: a `CalendarEvent` object adapter mapping the JMAP
+  Calendars `CalendarEvent` to and from `jscalendar.Event`, with a byte-stable
+  codec and the JMAP-specific members (`calendarIds`, `isDraft`, `utcStart`,
+  and the rest) layered onto the JSCalendar Event. Object mapping only —
+  the JMAP transport methods are out of scope. Standard-library only.
 
 ## [0.1.0]
 
