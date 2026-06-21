@@ -31,10 +31,11 @@ func reencode[T any](t *testing.T, raw string) []byte {
 
 // TestTopLevelTypeEmittedFirst checks that the mandatory "@type" member
 // (RFC 8984, Section 1.4.1) is the first key in the marshaled object for
-// each top-level type. The default encoding satisfies this only because
-// Type is the first declared field, so the test guards against a future
-// field reorder silently breaking the "emit @type first" rule before the
-// dedicated codec lands.
+// each top-level type. The codec (codec.go) relies on Type being the first
+// declared field for this, so the test guards against a future field
+// reorder silently breaking the "emit @type first" rule. Additional codec
+// behavior — forcing "@type" even when Type is zero, and order-tolerant
+// decode — is covered in codec_test.go.
 func TestTopLevelTypeEmittedFirst(t *testing.T) {
 	t.Parallel()
 
