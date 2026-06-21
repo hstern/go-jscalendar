@@ -29,7 +29,8 @@ import (
 // out-of-range "byHour", a "frequency" the spec does not define, or the
 // presence of both "count" and "until" all decode without error so the rule
 // round-trips. The two cross-field constraints the spec imposes are checked
-// only at the opt-in validation boundary of a later phase, not here:
+// only at the opt-in validation boundary ([Event.Validate] / [Task.Validate]),
+// not here:
 //
 //   - "frequency" is REQUIRED (Section 4.3.1). A rule with no Frequency is
 //     malformed; [RecurrenceRule.MarshalJSON] rejects it, but unmarshal

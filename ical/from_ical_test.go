@@ -140,7 +140,8 @@ func TestDurationFromDTEnd(t *testing.T) {
 
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART;TZID=America/New_York:20260115T090000\r\n"+
-			"DTEND;TZID=America/New_York:20260115T103000"))
+			"DTEND;TZID=America/New_York:20260115T103000",
+	))
 
 	if event.Duration == nil {
 		t.Fatal("Duration is nil")
@@ -155,7 +156,8 @@ func TestDurationExplicit(t *testing.T) {
 	t.Parallel()
 
 	event := singleEvent(t, wrapVEvent(
-		"DTSTART:20260115T090000Z\r\nDURATION:PT45M"))
+		"DTSTART:20260115T090000Z\r\nDURATION:PT45M",
+	))
 
 	if event.Duration == nil || event.Duration.String() != "PT45M" {
 		t.Errorf("Duration = %v, want PT45M", event.Duration)
@@ -168,7 +170,8 @@ func TestDurationAllDay(t *testing.T) {
 	t.Parallel()
 
 	event := singleEvent(t, wrapVEvent(
-		"DTSTART;VALUE=DATE:20260115\r\nDTEND;VALUE=DATE:20260118"))
+		"DTSTART;VALUE=DATE:20260115\r\nDTEND;VALUE=DATE:20260118",
+	))
 
 	if event.Duration == nil || event.Duration.String() != "P3D" {
 		t.Errorf("Duration = %v, want P3D", event.Duration)
@@ -182,7 +185,8 @@ func TestRRuleStructured(t *testing.T) {
 
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART:20260105T090000Z\r\n"+
-			"RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1SU;BYMONTH=3,11;BYMONTHDAY=1,-1;COUNT=5"))
+			"RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1SU;BYMONTH=3,11;BYMONTHDAY=1,-1;COUNT=5",
+	))
 
 	if len(event.RecurrenceRules) != 1 {
 		t.Fatalf("got %d rules, want 1", len(event.RecurrenceRules))
@@ -221,7 +225,8 @@ func TestRRuleByParts(t *testing.T) {
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART:20260105T090000Z\r\n"+
 			"RRULE:FREQ=YEARLY;WKST=SU;BYHOUR=9,17;BYMINUTE=30;BYSECOND=0;"+
-			"BYYEARDAY=1,-1;BYWEEKNO=1,-1;BYSETPOS=-1"))
+			"BYYEARDAY=1,-1;BYWEEKNO=1,-1;BYSETPOS=-1",
+	))
 
 	rule := event.RecurrenceRules[0]
 	if rule.FirstDayOfWeek != "su" {
@@ -253,7 +258,8 @@ func TestRRuleUntilDate(t *testing.T) {
 	t.Parallel()
 
 	event := singleEvent(t, wrapVEvent(
-		"DTSTART:20260105T090000Z\r\nRRULE:FREQ=WEEKLY;UNTIL=20260131"))
+		"DTSTART:20260105T090000Z\r\nRRULE:FREQ=WEEKLY;UNTIL=20260131",
+	))
 
 	rule := event.RecurrenceRules[0]
 	want := jscalendar.LocalDateTime{Year: 2026, Month: 1, Day: 31}
@@ -270,7 +276,8 @@ func TestRRuleUntilLocal(t *testing.T) {
 
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART;TZID=America/New_York:20260105T090000\r\n"+
-			"RRULE:FREQ=DAILY;UNTIL=20260131T235959Z"))
+			"RRULE:FREQ=DAILY;UNTIL=20260131T235959Z",
+	))
 
 	rule := event.RecurrenceRules[0]
 	if rule.Until == nil {
@@ -289,7 +296,8 @@ func TestExRuleExcluded(t *testing.T) {
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART:20260105T090000Z\r\n"+
 			"RRULE:FREQ=WEEKLY\r\n"+
-			"EXRULE:FREQ=WEEKLY;BYDAY=SA,SU"))
+			"EXRULE:FREQ=WEEKLY;BYDAY=SA,SU",
+	))
 
 	if len(event.RecurrenceRules) != 1 {
 		t.Fatalf("got %d recurrence rules, want 1", len(event.RecurrenceRules))
@@ -309,7 +317,8 @@ func TestValarmOffsetTrigger(t *testing.T) {
 
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART:20260105T090000Z\r\n"+
-			"BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15M\r\nEND:VALARM"))
+			"BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15M\r\nEND:VALARM",
+	))
 
 	if len(event.Alerts) != 1 {
 		t.Fatalf("got %d alerts, want 1", len(event.Alerts))
@@ -334,7 +343,8 @@ func TestValarmAbsoluteTrigger(t *testing.T) {
 
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART:20260105T090000Z\r\n"+
-			"BEGIN:VALARM\r\nACTION:EMAIL\r\nTRIGGER;VALUE=DATE-TIME:20260105T083000Z\r\nEND:VALARM"))
+			"BEGIN:VALARM\r\nACTION:EMAIL\r\nTRIGGER;VALUE=DATE-TIME:20260105T083000Z\r\nEND:VALARM",
+	))
 
 	alert := event.Alerts["1"]
 	if alert.Action != "email" {
@@ -356,7 +366,8 @@ func TestValarmRelatedEnd(t *testing.T) {
 
 	event := singleEvent(t, wrapVEvent(
 		"DTSTART:20260105T090000Z\r\n"+
-			"BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:PT10M\r\nEND:VALARM"))
+			"BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:PT10M\r\nEND:VALARM",
+	))
 
 	offset, ok := event.Alerts["1"].Trigger.Value().(jscalendar.OffsetTrigger)
 	if !ok {
@@ -385,7 +396,8 @@ func TestCommonProps(t *testing.T) {
 			"URL:https://example.com/q1\r\n"+
 			"CATEGORIES:finance,review\r\n"+
 			"ORGANIZER;CN=Alice:mailto:alice@example.com\r\n"+
-			"ATTENDEE;CN=Bob:mailto:bob@example.com"))
+			"ATTENDEE;CN=Bob:mailto:bob@example.com",
+	))
 
 	if event.UID != "test@example.com" {
 		t.Errorf("UID = %q", event.UID)

@@ -66,7 +66,7 @@ import (
 // metadata-rich forms are reduced to their RRULE-driven STANDARD / DAYLIGHT
 // rules. Properties with no field in the JSCalendar model are not silently
 // dropped into a typed field — they simply have no representation here and are
-// left for a later phase. The objects this produces validate cleanly under
+// left for a future release. The objects this produces validate cleanly under
 // [jscalendar.Event.Validate] / [jscalendar.Task.Validate].
 func FromICal(cal *goical.Calendar) ([]any, error) {
 	if cal == nil || cal.Component == nil {
