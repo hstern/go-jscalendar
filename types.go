@@ -12,12 +12,14 @@ import "encoding/json"
 // 5).
 //
 // Scope note: only the properties whose value types already exist in the
-// package are modeled here. The properties whose value types arrive in a
-// later phase — participants, locations, virtualLocations, links,
-// relatedTo, alerts, localizations, and the embedded timeZones map — are
-// deliberately omitted for now; see the TODO markers below. Each will be
-// added alongside its value type so the struct never carries a field whose
-// type does not yet compile.
+// package are modeled here. The participants, locations, and
+// virtualLocations sub-object maps are modeled (their value types live in
+// participant.go and location.go). The remaining sub-object properties
+// whose value types arrive in a later phase — links, relatedTo, alerts,
+// localizations, and the embedded timeZones map — are deliberately omitted
+// for now; see the TODO markers below. Each will be added alongside its
+// value type so the struct never carries a field whose type does not yet
+// compile.
 //
 // Marshaling note: the JSON codec for these three types lives in codec.go.
 // It emits the "@type" member first and always present (RFC 8984, Section
@@ -172,11 +174,23 @@ type Event struct {
 	// for floating time (Section 4.7.1).
 	TimeZone TimeZoneId `json:"timeZone,omitempty"`
 
-	// TODO(phase 4, JSCAL-18/19/20): participants, locations,
-	// virtualLocations, links, relatedTo, alerts, localizations, and the
-	// embedded timeZones map. Their value types (Participant, Location,
-	// VirtualLocation, Link, Relation, Alert, TimeZone) are added in
-	// phase 4; the fields land with them.
+	// --- Sub-object properties (Sections 4.2, 4.4) ---
+
+	// Participants maps a stable [Id] to a [Participant] involved in the
+	// event (Section 4.4.6). The key is a participant identifier preserved
+	// verbatim across a round trip — never renumbered.
+	Participants map[Id]Participant `json:"participants,omitempty"`
+	// Locations maps a stable [Id] to a physical [Location] of the event
+	// (Section 4.2.5). The key is preserved verbatim.
+	Locations map[Id]Location `json:"locations,omitempty"`
+	// VirtualLocations maps a stable [Id] to a [VirtualLocation] of the event
+	// (Section 4.2.6). The key is preserved verbatim.
+	VirtualLocations map[Id]VirtualLocation `json:"virtualLocations,omitempty"`
+
+	// TODO(phase 4, JSCAL-19/20): links, relatedTo, alerts, localizations,
+	// and the embedded timeZones map. Their value types (Link, Relation,
+	// Alert, TimeZone) are added in the remaining phase-4 issues; the fields
+	// land with them.
 
 	// Extra holds object members with no corresponding known property —
 	// vendor extensions and properties from future spec revisions, which
@@ -314,9 +328,22 @@ type Task struct {
 	// floating time (Section 4.7.1).
 	TimeZone TimeZoneId `json:"timeZone,omitempty"`
 
-	// TODO(phase 4, JSCAL-18/19/20): participants, locations,
-	// virtualLocations, links, relatedTo, alerts, localizations, and the
-	// embedded timeZones map land with their value types in phase 4.
+	// --- Sub-object properties (Sections 4.2, 4.4) ---
+
+	// Participants maps a stable [Id] to a [Participant] involved in the task
+	// (Section 4.4.6). The key is a participant identifier preserved verbatim
+	// across a round trip — never renumbered.
+	Participants map[Id]Participant `json:"participants,omitempty"`
+	// Locations maps a stable [Id] to a physical [Location] of the task
+	// (Section 4.2.5). The key is preserved verbatim.
+	Locations map[Id]Location `json:"locations,omitempty"`
+	// VirtualLocations maps a stable [Id] to a [VirtualLocation] of the task
+	// (Section 4.2.6). The key is preserved verbatim.
+	VirtualLocations map[Id]VirtualLocation `json:"virtualLocations,omitempty"`
+
+	// TODO(phase 4, JSCAL-19/20): links, relatedTo, alerts, localizations,
+	// and the embedded timeZones map land with their value types in the
+	// remaining phase-4 issues.
 
 	// Extra holds object members with no corresponding known property.
 	// See the [Event.Extra] documentation for the full semantics: unknown
