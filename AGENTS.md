@@ -63,11 +63,20 @@ the bootstrap scaffold) may be a single line.
   justification in the PR description. Default answer is still
   "no" — the bar is "the spec demands data we cannot reasonably
   ship ourselves."
-  - **The one standing exception** is the `jscalendar/ical` subpackage,
+  - **The first standing exception** is the `jscalendar/ical` subpackage,
     which depends on [`github.com/emersion/go-ical`](https://github.com/emersion/go-ical)
     rather than re-implementing RFC 5545 parsing. This dependency is
     confined to that subpackage: importers of the core `jscalendar`
     package never pull it into their `go.sum`.
+  - **The second standing exception** is the `jscalendar/recur`
+    subpackage, which leans on
+    [`github.com/teambition/rrule-go`](https://github.com/teambition/rrule-go)
+    for the RRULE expansion math (positional `byDay`, `bySetPosition`,
+    `byWeekNo`) rather than hand-rolling it. The engine is already in the
+    module graph transitively via go-ical, and the dependency is confined
+    to the `recur` subpackage — verify with
+    `go list -deps github.com/hstern/go-jscalendar`, which never lists it.
+    The core package models recurrence rules but does not expand them.
 - **Tests: standard library only by default.** Test-only deps
   still need a one-line justification.
 - **Build-time tooling: unconstrained.** Generators, linters,
