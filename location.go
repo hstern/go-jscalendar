@@ -47,14 +47,9 @@ type Location struct {
 	// Coordinates is a "geo:" URI (RFC 5870) giving the location's
 	// geographic position, e.g. "geo:40.7829,-73.9654" (Section 4.2.5).
 	Coordinates string `json:"coordinates,omitempty"`
-	// Links is the set of links relevant to this location, keyed by [Id]
-	// (Section 4.2.5). The Link value type arrives in a later phase; until
-	// then the values are kept as [json.RawMessage] so a location carrying a
-	// links map round-trips byte-stably.
-	//
-	// TODO(JSCAL-19): replace json.RawMessage with the typed Link value once
-	// the links property and its Link type land.
-	Links map[Id]json.RawMessage `json:"links,omitempty"`
+	// Links is the set of [Link]s relevant to this location, keyed by [Id]
+	// (Section 4.2.5).
+	Links map[Id]Link `json:"links,omitempty"`
 
 	// Extra holds Location members with no corresponding known property,
 	// preserved verbatim for a lossless, byte-stable round trip (see
